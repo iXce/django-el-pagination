@@ -9,6 +9,7 @@ from django.core.paginator import (
     PageNotAnInteger,
     Paginator,
 )
+from infinite_scroll_pagination.paginator import SeekPaginator, SeekPage
 
 
 class CustomPage(Page):

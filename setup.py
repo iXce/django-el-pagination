@@ -9,6 +9,7 @@ VENV_LINK = os.path.join(VENV, 'local')
 
 install_requires = [
     'django>=1.8.0',
+    'django-infinite-scroll-pagination==0.1.3',
 ]
 
 project = __import__(PROJECT_NAME)

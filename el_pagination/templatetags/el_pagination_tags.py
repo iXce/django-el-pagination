@@ -15,6 +15,8 @@ from el_pagination.paginators import (
     DefaultPaginator,
     EmptyPage,
     LazyPaginator,
+    SeekPaginator,
+    SeekPage,
 )
 
 
@@ -195,6 +197,17 @@ def lazy_paginate(parser, token):
     """
     return paginate(parser, token, paginator_class=LazyPaginator)
 
+@register.tag
+def seek_paginate(parser, token):
+    """Lazy paginate objects.
+
+    Paginate objects without hitting the database with a *select count* query.
+
+    Use this the same way as *paginate* tag when you are not interested
+    in the total number of pages.
+    """
+    return paginate(parser, token, paginator_class=SeekPaginator)
+
 
 class PaginateNode(template.Node):
     """Add to context the objects of the current page.
@@ -294,8 +307,12 @@ class PaginateNode(template.Node):
 
         # Retrieve the queryset and create the paginator object.
         objects = self.objects.resolve(context)
-        paginator = self.paginator(
-            objects, per_page, first_page=first_page, orphans=settings.ORPHANS)
+        if self.paginator == SeekPaginator:
+            paginator = self.paginator(
+                objects, per_page, "pk")
+        else:
+            paginator = self.paginator(
+                objects, per_page, first_page=first_page, orphans=settings.ORPHANS)
 
         # Normalize the default page number if a negative one is provided.
         if default_number < 0:
@@ -307,10 +324,16 @@ class PaginateNode(template.Node):
             context['request'], querystring_key, default=default_number)
 
         # Get the page.
-        try:
-            page = paginator.page(page_number)
-        except EmptyPage:
-            page = paginator.page(1)
+        if isinstance(paginator, SeekPaginator):
+            try:
+                page = paginator.page(value = page_number, pk = page_number)
+            except EmptyPage:
+                page = paginator.page()
+        else:
+            try:
+                page = paginator.page(page_number)
+            except EmptyPage:
+                page = paginator.page(1)
 
         # Populate the context with required data.
         data = {
@@ -352,7 +375,10 @@ def show_more(context, label=None, loading=settings.LOADING, class_name=None):
     # show the template only if there is a next page
     if page.has_next():
         request = context['request']
-        page_number = page.next_page_number()
+        if isinstance(page, SeekPage):
+            page_number = page.next_page_pk()
+        else:
+            page_number = page.next_page_number()
         # Generate the querystring.
         querystring_key = data['querystring_key']
         querystring = utils.get_querystring_for_page(
